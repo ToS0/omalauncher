@@ -337,6 +337,7 @@ fun HomeScreen(
                 showPage = page
             },
             onGroup = { app, target -> engine.shortcuts.group(app, target) },
+            onReorder = { app, before -> engine.shortcuts.moveBefore(app.key, before) },
         )
     }
 
