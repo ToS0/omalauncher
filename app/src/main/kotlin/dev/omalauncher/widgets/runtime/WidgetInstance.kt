@@ -388,6 +388,12 @@ class WidgetInstance(
             mediaArt?.takeIf { it.first === art }?.let { return it.second }
             return art.asImageBitmap().also { mediaArt = art to it }
         }
+        // App icons from android.apps (`app:pkg/class`); already decoded in the app catalog.
+        if (src.startsWith("app:")) {
+            images[src]?.let { return it }
+            val art = services.androidImage(src) ?: return null
+            return art.asImageBitmap().also { images[src] = it }
+        }
         if (src !in imageRequests) {
             // Not from inside a draw: that would write state while drawing.
             scope?.launch {
