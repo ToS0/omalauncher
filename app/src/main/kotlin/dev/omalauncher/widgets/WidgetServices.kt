@@ -27,6 +27,7 @@ import android.widget.Toast
 import dev.omalauncher.MainActivity
 import dev.omalauncher.R
 import dev.omalauncher.Runtime
+import dev.omalauncher.androidAppId
 import dev.omalauncher.linux.GuestShell
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.linux.ShellPool
@@ -153,7 +154,8 @@ class WidgetServices(
         if (src.startsWith("media:")) return media.art(src)
         if (src.startsWith("app:")) {
             val component = ComponentName.unflattenFromString(src.removePrefix("app:")) ?: return null
-            return runtime.androidApps.icons[component]?.asAndroidBitmap()
+            // The phone's own profile only, like the list below.
+            return runtime.androidApps.icons[androidAppId(component, null)]?.asAndroidBitmap()
         }
         return null
     }
@@ -240,10 +242,12 @@ class WidgetServices(
      * Launchable Android apps for `source a = android.apps`. Each item is
      * `{name, package, component, system, icon}`; `icon` is `app:pkg/class` for
      * `Image { src: a.icon }`. Polled like `android.system` (icons fill in after labels).
+     * Only the phone's own profile: a widget, perhaps one from the store, has no business
+     * listing what's in the work profile or the private space.
      */
     private fun apps(): Value {
         val items =
-            runtime.androidApps.apps.take(Builtins.MAX_LIST).map { app ->
+            runtime.androidApps.apps.filter { it.profile == null }.take(Builtins.MAX_LIST).map { app ->
                 val component = app.component.flattenToShortString()
                 Obj(
                     mapOf(
