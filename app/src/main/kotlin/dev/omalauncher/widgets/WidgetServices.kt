@@ -7,16 +7,19 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.app.ActivityManager
+import android.graphics.Bitmap
 import android.hardware.display.DisplayManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.view.Display
+import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.omalauncher.BuildConfig
 import android.os.SystemClock
 import android.util.Log
@@ -28,6 +31,8 @@ import dev.omalauncher.linux.GuestShell
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.linux.ShellPool
 import dev.omalauncher.linux.ShellResult
+import dev.omalauncher.widgets.lang.Builtins
+import dev.omalauncher.widgets.lang.Lst
 import dev.omalauncher.widgets.lang.Null
 import dev.omalauncher.widgets.lang.Num
 import dev.omalauncher.widgets.lang.Obj
@@ -116,6 +121,7 @@ class WidgetServices(
             "media" -> media.value()
             "notifications" -> notifications.value()
             "volume" -> volume.value()
+            "apps" -> apps()
             else -> throw WidgetError("unknown android source $name")
         }
 
@@ -143,7 +149,14 @@ class WidgetServices(
             else -> null
         }
 
-    override fun androidImage(src: String) = media.art(src)
+    override fun androidImage(src: String): Bitmap? {
+        if (src.startsWith("media:")) return media.art(src)
+        if (src.startsWith("app:")) {
+            val component = ComponentName.unflattenFromString(src.removePrefix("app:")) ?: return null
+            return runtime.androidApps.icons[component]?.asAndroidBitmap()
+        }
+        return null
+    }
 
     override fun terminal(
         command: String?,
@@ -221,6 +234,28 @@ class WidgetServices(
                 "apps" to num(runtime.androidApps.apps.count { !runtime.androidApps.isPrivate(it.profile) }.toLong()),
             ),
         )
+    }
+
+    /**
+     * Launchable Android apps for `source a = android.apps`. Each item is
+     * `{name, package, component, system, icon}`; `icon` is `app:pkg/class` for
+     * `Image { src: a.icon }`. Polled like `android.system` (icons fill in after labels).
+     */
+    private fun apps(): Value {
+        val items =
+            runtime.androidApps.apps.take(Builtins.MAX_LIST).map { app ->
+                val component = app.component.flattenToShortString()
+                Obj(
+                    mapOf(
+                        "name" to Str(app.label),
+                        "package" to Str(app.component.packageName),
+                        "component" to Str(component),
+                        "system" to bool(app.system),
+                        "icon" to Str("app:$component"),
+                    ),
+                )
+            }
+        return Lst(items)
     }
 
     /** Android hides the battery from the guest (/sys/class/power_supply), so expose it here. */
