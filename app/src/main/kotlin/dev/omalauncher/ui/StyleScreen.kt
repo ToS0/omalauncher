@@ -67,24 +67,21 @@ import java.io.File
 fun StyleScreen(
     runtime: Runtime,
     onDismiss: () -> Unit,
+    /** Opens the community themes over this screen. */
+    onBrowse: () -> Unit,
 ) {
     val store = runtime.themes
     val scope = rememberCoroutineScope()
     // Themes added in Linux since the launcher started.
     LaunchedEffect(Unit) { if (store.loaded) store.rescan() }
-    var browsing by remember { mutableStateOf(false) }
     var installOpen by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf<OmarchyTheme?>(null) }
-    if (browsing) {
-        ThemeCatalogScreen(store, onDismiss = { browsing = false })
-        return
-    }
     val linux by runtime.bootstrap.state.collectAsState()
     OverlayPanel("style", onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             ThemeSection(
                 store,
-                onBrowse = { browsing = true },
+                onBrowse = onBrowse,
                 onInstall = {
                     store.clearInstallError()
                     installOpen = true
@@ -97,6 +94,8 @@ fun StyleScreen(
             StyleOption("icons", listOf("monochrome", "colored"), if (LauncherStyle.monochromeIcons) 0 else 1) { store.setMonochromeIcons(it == 0) }
             StyleOption("home apps", listOf("boxed", "icon only"), if (LauncherStyle.bareAppIcons) 1 else 0) { store.setBareAppIcons(it == 1) }
             StyleOption("recent apps", listOf("shown", "hidden"), if (LauncherStyle.recentApps) 0 else 1) { store.setRecentApps(it == 0) }
+            StyleOption("keyboard", listOf("opens with apps", "on tap"), if (LauncherStyle.drawerKeyboard) 0 else 1) { store.setDrawerKeyboard(it == 0) }
+            StyleOption("drawer", listOf("all apps", "not on home"), if (LauncherStyle.homeAppsInDrawer) 0 else 1) { store.setHomeAppsInDrawer(it == 0) }
             StyleOption("corners", Corners.entries.map { it.label }, LauncherStyle.corners.ordinal) { store.setCorners(Corners.entries[it]) }
             if (linux == LinuxState.Installed) TerminalSection(runtime.terminalFont)
         }
@@ -231,7 +230,7 @@ private fun BackgroundSection(
 /** The terminals' font and the size they open at, on top of Android's font size; see [TerminalFont]. */
 @Composable
 private fun TerminalSection(font: TerminalFont) {
-    LaunchedEffect(Unit) { font.familiesLoaded(withContext(Dispatchers.IO) { font.loadFamilies() }) }
+    LaunchedEffect(Unit) { font.refreshFamilies() }
     SectionLabel("terminal")
     FontOption(font.families, font.family, font::select)
     BasicText(

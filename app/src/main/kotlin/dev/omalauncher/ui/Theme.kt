@@ -103,6 +103,12 @@ object LauncherStyle {
     /** The strip of recently used apps above the bar on home. */
     var recentApps by mutableStateOf(true)
 
+    /** Opening the app drawer brings up the keyboard too; otherwise only a tap on the bar does. */
+    var drawerKeyboard by mutableStateOf(true)
+
+    /** The app drawer lists apps pinned to home (on their own or in a folder) too; search finds them either way. */
+    var homeAppsInDrawer by mutableStateOf(true)
+
     /** How frames (tiles, panels, menus, fields) round their corners. */
     var corners by mutableStateOf(Corners.Edge)
 
@@ -144,6 +150,9 @@ fun Modifier.frame(
  * safe edges, and from full-screen panels to those edges, so a panel's frame lines up with the tiles'.
  */
 val HomeGap = 6.dp
+
+/** The widest a column of text and rows gets on a big screen: the bar beside landscape home, text-heavy panels. */
+val ReadingWidth = 640.dp
 
 /** A home-screen surface over the wallpaper: tiles, the prompt bar, the rails; accent while [focused]. */
 fun Modifier.tile(focused: Boolean = false): Modifier = frame(2.dp, if (focused) Palette.accent else Palette.border, Palette.glass)

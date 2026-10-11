@@ -28,12 +28,16 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import dev.omalauncher.linux.JobState
 
-/** A full-screen framed panel with a title, optional [actions] and a close button: themes, agents, the store. */
+/**
+ * A full-screen framed panel with a title, optional [actions] and a close button: themes, agents, the store.
+ * With a [contentWidth], a wide screen centers the content at that width; the frame and title still span the panel.
+ */
 @Composable
 fun OverlayPanel(
     title: String,
     onDismiss: () -> Unit,
     actions: @Composable RowScope.() -> Unit = {},
+    contentWidth: Dp = Dp.Unspecified,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(
@@ -59,7 +63,11 @@ fun OverlayPanel(
                 Symbol(Glyph.Close, Palette.red, Modifier.clickable(onClick = onDismiss).padding(8.dp), TextSize.Title)
             }
             Spacer(Modifier.height(8.dp))
-            content()
+            if (contentWidth == Dp.Unspecified) {
+                content()
+            } else {
+                Column(Modifier.weight(1f).widthIn(max = contentWidth).fillMaxWidth().align(Alignment.CenterHorizontally), content = content)
+            }
         }
     }
 }
