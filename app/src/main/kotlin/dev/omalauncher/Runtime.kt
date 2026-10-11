@@ -281,6 +281,9 @@ class Runtime(
                 proot.procShim.start()
                 openBridge.start()
             }
+        } else {
+            // Linux installed again: its new home has no foot-font.ini yet.
+            terminalFont.write()
         }
         linux = true
         // The recent apps strip on home lists Linux apps before the app list is ever opened.
