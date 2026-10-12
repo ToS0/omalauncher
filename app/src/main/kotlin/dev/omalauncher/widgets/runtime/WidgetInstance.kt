@@ -388,7 +388,7 @@ class WidgetInstance(
             mediaArt?.takeIf { it.first === art }?.let { return it.second }
             return art.asImageBitmap().also { mediaArt = art to it }
         }
-        // App icons from android.apps (`app:pkg/class`); already decoded in the app catalog.
+        // App icons from android.apps (`app:` + AndroidApp.key); already decoded in the catalog.
         if (src.startsWith("app:")) {
             images[src]?.let { return it }
             val art = services.androidImage(src) ?: return null

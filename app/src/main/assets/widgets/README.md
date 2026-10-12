@@ -66,7 +66,7 @@ that read it redraw. Properties are separated by newlines or `;`.
 | `source bat = android.battery` | `{level, charging, status, temp, voltage, health, plugged, technology, cycles}` from Android, updated as it changes (`temp` in °C, `voltage` in V; `health`, `plugged`, `technology` and `cycles` are null when the phone doesn't say) |
 | `source dev = android.device` | the phone: `{model, maker, android, sdk, soc}` (the Linux side can't see these) |
 | `source sys = android.system every 5s` | the phone's state, polled: `{kernel, uptime, memory, storage, cpu, display, build, codename, patch, locale, timezone, launcher, theme, apps}`. `uptime` is in seconds; `memory` is `{total, used, available}` and `storage` `{total, used, free}`, in bytes; `cpu` is `{soc, maker, hardware, cores, abi, maxMhz}`; `display` is `{width, height, hz, dpi}`; `patch` is the security patch date, `launcher` this launcher's version, `theme` the Omarchy theme's name and `apps` how many Android apps are installed. See `20-fetch.owl` (owl 5) |
-| `source a = android.apps every 1m` | launchable Android apps, polled: a list of `{name, package, component, system, icon}`. `icon` is `app:package/class` for `Image { src: a.icon }`; open one with `androidApp(a.package)`. See owl 5 |
+| `source a = android.apps every 1m` | launchable Android apps, polled: a list of `{key, name, package, component, profile, system, icon}`. `key` is unique across profiles (short component, plus `@serial` for a work/clone profile); `profile` is null on the phone's own apps. `icon` is `app:$key` for `Image { src: a.icon }`; open with `androidApp(a.key)` (a package still opens the personal copy). See owl 5 |
 | `source m = android.media` | what's playing in any app on the phone: `{available, playing, title, artist, album, app, package, position, duration, art}`, updated as it changes (`position` and `duration` in seconds; `art` goes in `Image { src: m.art }`). `available` is false until the user grants notification access; `media(...)` opens that setting then. See `examples/97-now-playing.owl` |
 | `source n = android.notifications` | the phone's notifications, newest first, updated as they come and go: `{available, count, items}`, each item `{key, app, package, title, text, time, clearable}` (`time` in Unix seconds). Ongoing ones (music, downloads) are left out. Needs the same notification access as media. See `examples/98-notifications.owl` (owl 4) |
 | `source v = android.volume` | the media volume: `{level, muted, steps}` (`level` in percent, `steps` how many the phone has), updated as it changes. Set it with `volume(...)` (owl 4) |
@@ -221,11 +221,11 @@ the widget that ran it refreshes its sources; other widgets keep their own inter
 | `app("gtk3-demo")` | starts a graphical Linux app |
 | `run("cmd")` | runs in the background (on its own shell, never retried), then refreshes this widget |
 | `x = run("cmd")` | the same, and puts the command's output into the state `x` when it finishes |
-| `androidApp("org.pkg")` | opens an Android app by package name |
+| `androidApp(a.key)` | opens an Android app by `android.apps` key (right profile); a package name still opens the personal copy |
 | `copy(text)` | copies text to the Android clipboard |
 | `notify("title", "text")` | posts an Android notification (if the launcher may post them) |
 | `url("https://...")` | opens in the Android browser |
-| `launcher("themes")` | `themes`, `agents`, `store`, `drawer` or `linux` (the sheet that installs Linux) |
+| `launcher("style")` | opens a launcher screen: `style` (theme, background, home screen, terminal; `themes` too), `agents`, `store`, `drawer` or `linux` (the sheet that installs Linux) |
 | `refresh()` | re-runs this widget's sources now |
 | `screen()` / `close()` | opens the widget's `screen { }` full screen, or closes it (owl 5) |
 | `media("toggle")` | controls what's playing: `toggle`, `play`, `pause`, `next`, `previous`, or `open` (brings up the player app) |

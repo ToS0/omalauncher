@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -88,7 +87,7 @@ class WidgetServices(
     private val notifications = Notifications(context, media)
     private val volume = Volume(context)
 
-    /** Opens launcher screens ("themes", "agents", "drawer"); set by the UI. */
+    /** Opens launcher screens ("style" or "themes", "agents", "drawer"); set by the UI. */
     var launcherAction: ((String) -> Unit)? = null
 
     private val recent = HashMap<String, Pair<Long, Deferred<ShellResult>>>()
@@ -151,10 +150,8 @@ class WidgetServices(
 
     override fun androidImage(src: String): Bitmap? {
         if (src.startsWith("media:")) return media.art(src)
-        if (src.startsWith("app:")) {
-            val component = ComponentName.unflattenFromString(src.removePrefix("app:")) ?: return null
-            return runtime.androidApps.icons[component]?.asAndroidBitmap()
-        }
+        // Keys are AndroidApp.key (short component, plus @serial for another profile).
+        if (src.startsWith("app:")) return runtime.androidApps.icons[src.removePrefix("app:")]?.asAndroidBitmap()
         return null
     }
 
@@ -237,20 +234,24 @@ class WidgetServices(
 
     /**
      * Launchable Android apps for `source a = android.apps`. Each item is
-     * `{name, package, component, system, icon}`; `icon` is `app:pkg/class` for
-     * `Image { src: a.icon }`. Polled like `android.system` (icons fill in after labels).
+     * `{key, name, package, component, profile, system, icon}`; `key` is
+     * [dev.omalauncher.AndroidApp.key] (short component, plus `@serial` for another
+     * profile), `profile` is null on the phone's own apps, and `icon` is `app:$key`
+     * for `Image { src: a.icon }`. Open with `androidApp(a.key)`. Polled like
+     * `android.system` (icons fill in after labels).
      */
     private fun apps(): Value {
         val items =
             runtime.androidApps.apps.take(Builtins.MAX_LIST).map { app ->
-                val component = app.component.flattenToShortString()
                 Obj(
                     mapOf(
+                        "key" to Str(app.key),
                         "name" to Str(app.label),
                         "package" to Str(app.component.packageName),
-                        "component" to Str(component),
+                        "component" to Str(app.component.flattenToShortString()),
+                        "profile" to (app.profile?.let { Num(it.toDouble()) } ?: Null),
                         "system" to bool(app.system),
-                        "icon" to Str("app:$component"),
+                        "icon" to Str("app:${app.key}"),
                     ),
                 )
             }
@@ -319,7 +320,8 @@ class WidgetServices(
             "media" -> media.control(arg)
             "volume" -> volume.control(args[0])
             "notification" -> args.getOrNull(1)?.takeIf { it != Null }?.let { notifications.control(arg, it.toString()) }
-            "androidApp" -> context.packageManager.getLaunchIntentForPackage(arg)?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            // Prefer AndroidApp.key (opens the right profile); a bare package still works for the personal copy.
+            "androidApp" -> openAndroidApp(arg)
             "copy" -> copy(arg)
             "notify" -> notify(arg, args.getOrNull(1)?.takeIf { it != Null }?.toString())
         }
@@ -364,6 +366,25 @@ class WidgetServices(
                 ShellResult("", e.message ?: e.toString(), -1)
             }
         }
+
+    /**
+     * Opens an Android app by [AndroidApp.key] (or package, for older widgets).
+     * Goes through the catalog so work-profile apps start in the right user.
+     */
+    private fun openAndroidApp(arg: String) {
+        val apps = runtime.androidApps.apps
+        val app =
+            apps.find { it.key == arg }
+                ?: apps.find { it.component.packageName == arg && it.profile == null }
+                ?: apps.find { it.component.packageName == arg }
+        if (app != null) {
+            runtime.androidApps.open(app)
+            return
+        }
+        context.packageManager.getLaunchIntentForPackage(arg)?.let {
+            context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
 
     private fun copy(text: String) {
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("widget", text))
