@@ -11,12 +11,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.app.ActivityManager
+import android.graphics.Bitmap
 import android.hardware.display.DisplayManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.view.Display
+import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.omalauncher.BuildConfig
 import android.os.SystemClock
 import android.util.Log
@@ -28,6 +30,8 @@ import dev.omalauncher.linux.GuestShell
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.linux.ShellPool
 import dev.omalauncher.linux.ShellResult
+import dev.omalauncher.widgets.lang.Builtins
+import dev.omalauncher.widgets.lang.Lst
 import dev.omalauncher.widgets.lang.Null
 import dev.omalauncher.widgets.lang.Num
 import dev.omalauncher.widgets.lang.Obj
@@ -116,6 +120,7 @@ class WidgetServices(
             "media" -> media.value()
             "notifications" -> notifications.value()
             "volume" -> volume.value()
+            "apps" -> apps()
             else -> throw WidgetError("unknown android source $name")
         }
 
@@ -143,7 +148,12 @@ class WidgetServices(
             else -> null
         }
 
-    override fun androidImage(src: String) = media.art(src)
+    override fun androidImage(src: String): Bitmap? {
+        if (src.startsWith("media:")) return media.art(src)
+        // Keys are AndroidApp.key (short component, plus @serial for another profile).
+        if (src.startsWith("app:")) return runtime.androidApps.icons[src.removePrefix("app:")]?.asAndroidBitmap()
+        return null
+    }
 
     override fun terminal(
         command: String?,
@@ -223,6 +233,32 @@ class WidgetServices(
         )
     }
 
+    /**
+     * Launchable Android apps for `source a = android.apps`. Each item is
+     * `{key, name, package, component, profile, system, icon}`; `key` is
+     * [dev.omalauncher.AndroidApp.key] (short component, plus `@serial` for another
+     * profile), `profile` is null on the phone's own apps, and `icon` is `app:$key`
+     * for `Image { src: a.icon }`. Open with `androidApp(a.key)`. Polled like
+     * `android.system` (icons fill in after labels).
+     */
+    private fun apps(): Value {
+        val items =
+            runtime.androidApps.apps.take(Builtins.MAX_LIST).map { app ->
+                Obj(
+                    mapOf(
+                        "key" to Str(app.key),
+                        "name" to Str(app.label),
+                        "package" to Str(app.component.packageName),
+                        "component" to Str(app.component.flattenToShortString()),
+                        "profile" to (app.profile?.let { Num(it.toDouble()) } ?: Null),
+                        "system" to bool(app.system),
+                        "icon" to Str("app:${app.key}"),
+                    ),
+                )
+            }
+        return Lst(items)
+    }
+
     /** Android hides the battery from the guest (/sys/class/power_supply), so expose it here. */
     private fun battery(): Value {
         val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -285,7 +321,8 @@ class WidgetServices(
             "media" -> media.control(arg)
             "volume" -> volume.control(args[0])
             "notification" -> args.getOrNull(1)?.takeIf { it != Null }?.let { notifications.control(arg, it.toString()) }
-            "androidApp" -> context.packageManager.getLaunchIntentForPackage(arg)?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            // Prefer AndroidApp.key (opens the right profile); a bare package still works for the personal copy.
+            "androidApp" -> openAndroidApp(arg)
             "copy" -> copy(arg)
             "notify" -> notify(arg, args.getOrNull(1)?.takeIf { it != Null }?.toString())
         }
@@ -330,6 +367,25 @@ class WidgetServices(
                 ShellResult("", e.message ?: e.toString(), -1)
             }
         }
+
+    /**
+     * Opens an Android app by [AndroidApp.key] (or package, for older widgets).
+     * Goes through the catalog so work-profile apps start in the right user.
+     */
+    private fun openAndroidApp(arg: String) {
+        val apps = runtime.androidApps.apps
+        val app =
+            apps.find { it.key == arg }
+                ?: apps.find { it.component.packageName == arg && it.profile == null }
+                ?: apps.find { it.component.packageName == arg }
+        if (app != null) {
+            runtime.androidApps.open(app)
+            return
+        }
+        context.packageManager.getLaunchIntentForPackage(arg)?.let {
+            context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
 
     private fun copy(text: String) {
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("widget", text))
