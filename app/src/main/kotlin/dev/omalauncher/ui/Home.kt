@@ -246,6 +246,7 @@ fun HomeScreen(
             pager = pager,
             pages = pageNumbers,
             itemsOn = engine::itemsOn,
+            hiddenOn = engine::hiddenOn,
             layout = engine.layout,
             arrange = arrange,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -312,6 +313,8 @@ fun HomeScreen(
                                 runtime.open(item)
                             },
                             paused = runtime.androidApps.paused(item.profile),
+                            clone = runtime.androidApps.cloned(item.profile),
+                            private = runtime.androidApps.isPrivate(item.profile),
                         )
                     is Folder ->
                         FolderTile(
