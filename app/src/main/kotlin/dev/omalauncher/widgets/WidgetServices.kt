@@ -151,7 +151,12 @@ class WidgetServices(
     override fun androidImage(src: String): Bitmap? {
         if (src.startsWith("media:")) return media.art(src)
         // Keys are AndroidApp.key (short component, plus @serial for another profile).
-        if (src.startsWith("app:")) return runtime.androidApps.icons[src.removePrefix("app:")]?.asAndroidBitmap()
+        if (src.startsWith("app:")) {
+            val key = src.removePrefix("app:")
+            // Not the private space's, which android.apps leaves out: a guessed key would tell what's in it.
+            if (runtime.androidApps.apps.any { it.key == key && it.private }) return null
+            return runtime.androidApps.icons[key]?.asAndroidBitmap()
+        }
         return null
     }
 
@@ -239,11 +244,12 @@ class WidgetServices(
      * [dev.omalauncher.AndroidApp.key] (short component, plus `@serial` for another
      * profile), `profile` is null on the phone's own apps, and `icon` is `app:$key`
      * for `Image { src: a.icon }`. Open with `androidApp(a.key)`. Polled like
-     * `android.system` (icons fill in after labels).
+     * `android.system` (icons fill in after labels). Widgets are shared code, so the
+     * private space's apps stay out, as they do from the count in `android.system`.
      */
     private fun apps(): Value {
         val items =
-            runtime.androidApps.apps.take(Builtins.MAX_LIST).map { app ->
+            runtime.androidApps.apps.filter { !it.private }.take(Builtins.MAX_LIST).map { app ->
                 Obj(
                     mapOf(
                         "key" to Str(app.key),
@@ -370,10 +376,10 @@ class WidgetServices(
 
     /**
      * Opens an Android app by [AndroidApp.key] (or package, for older widgets).
-     * Goes through the catalog so work-profile apps start in the right user.
+     * Goes through the catalog so work-profile apps start in the right user. Not the private space's.
      */
     private fun openAndroidApp(arg: String) {
-        val apps = runtime.androidApps.apps
+        val apps = runtime.androidApps.apps.filter { !it.private }
         val app =
             apps.find { it.key == arg }
                 ?: apps.find { it.component.packageName == arg && it.profile == null }
