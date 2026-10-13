@@ -105,14 +105,16 @@ data class AndroidShortcut(
     val profile: Long? = null,
     /** As in [AndroidApp.clone]. */
     val clone: Boolean = false,
+    /** As in [AndroidApp.private]. */
+    val private: Boolean = false,
 ) {
     /** As [AndroidApp.key]: icons, usage and pinned tiles go by it. */
     val key get() = androidShortcutKey(ref, profile)
 
-    val spoken get() = spokenLabel(label, profile, clone)
+    val spoken get() = spokenLabel(label, profile, clone, private)
 
     /** As in [AndroidApp.work]: on the drawer's work tab. */
-    val work get() = profile != null && !clone
+    val work get() = profile != null && !clone && !private
 }
 
 /**
@@ -365,7 +367,7 @@ class AndroidAppCatalog(
         reload()
         val user = info.userHandle
         val profile = serialOf(user)
-        return AndroidShortcut(shortcutLabel(info), ShortcutRef(info.`package`, info.id), user, profile, cloned(profile))
+        return AndroidShortcut(shortcutLabel(info), ShortcutRef(info.`package`, info.id), user, profile, cloned(profile), isPrivate(profile))
     }
 
     /** Unpins [shortcut]: it leaves the drawer, and is gone unless its app keeps it for itself. */
@@ -488,7 +490,7 @@ class AndroidAppCatalog(
                                 if (profile != null && private) privates += profile
                                 if (profile != null && !clone && !private) works += profile
                                 // A paused profile's shortcuts can't be listed; they stay, dimmed like its apps, and opening one resumes it.
-                                if (canList) made += if (profile != null && profile in paused) listed.filter { it.profile == profile }.map { null to it } else pinnedShortcuts(user, profile, clone)
+                                if (canList) made += if (profile != null && profile in paused) listed.filter { it.profile == profile }.map { null to it } else pinnedShortcuts(user, profile, clone, private)
                                 runCatching { launcherApps.getActivityList(null, user) }
                                     .onFailure { Log.w(TAG, "cannot list apps in $user", it) }
                                     .getOrDefault(emptyList())
@@ -524,7 +526,7 @@ class AndroidAppCatalog(
                 }
                 // Apps change a shortcut's icon without an update, so these are drawn again each time; there are only a few.
                 for ((info, shortcut) in made) {
-                    if (info != null) loadIcon(shortcut.key, shortcut.profile, shortcut.clone, false) { launcherApps.getShortcutIconDrawable(info, context.resources.displayMetrics.densityDpi) }
+                    if (info != null) loadIcon(shortcut.key, shortcut.profile, shortcut.clone, shortcut.private) { launcherApps.getShortcutIconDrawable(info, context.resources.displayMetrics.densityDpi) }
                 }
             }
     }
@@ -534,13 +536,14 @@ class AndroidAppCatalog(
         user: UserHandle,
         profile: Long?,
         clone: Boolean,
+        private: Boolean,
     ): List<Pair<ShortcutInfo, AndroidShortcut>> =
         runCatching { launcherApps.getShortcuts(ShortcutQuery().setQueryFlags(ShortcutQuery.FLAG_MATCH_PINNED), user) }
             .onFailure { Log.w(TAG, "cannot list shortcuts in $user", it) }
             .getOrNull()
             .orEmpty()
             .filter { it.isEnabled }
-            .map { it to AndroidShortcut(shortcutLabel(it), ShortcutRef(it.`package`, it.id), user, profile, clone) }
+            .map { it to AndroidShortcut(shortcutLabel(it), ShortcutRef(it.`package`, it.id), user, profile, clone, private) }
 
     /** Draws [key]'s icon off the main thread; both styles up front so switching is instant, and masks are 1 byte per pixel. */
     private fun CoroutineScope.loadIcon(

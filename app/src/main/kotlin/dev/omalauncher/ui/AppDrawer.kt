@@ -131,7 +131,7 @@ internal sealed interface AppHit {
         override val key get() = "s:" + shortcut.key
         override val label get() = shortcut.label
         override val spoken get() = shortcut.spoken
-        override val alias get() = if (shortcut.profile != null) "${shortcut.label} ${if (shortcut.clone) "clone" else "work"}" else null
+        override val alias get() = if (shortcut.profile != null) "${shortcut.label} ${if (shortcut.clone) "clone" else if (shortcut.private) "private" else "work"}" else null
 
         override fun paused(runtime: Runtime) = runtime.androidApps.paused(shortcut.profile)
     }
@@ -217,10 +217,10 @@ internal class BarSearch(
     fun highlighted(picked: Int?) = picked?.coerceIn(-1, hits.lastIndex) ?: if (opensApp) 0 else -1
 }
 
-// A locked private space's apps aren't to be found at all, as Android asks of launchers.
+// A locked private space's apps and shortcuts aren't to be found at all, as Android asks of launchers.
 private fun allApps(runtime: Runtime): List<AppHit> =
     runtime.linuxApps.map { AppHit.Linux(it) } + runtime.androidApps.apps.filterNot { runtime.androidApps.isLocked(it.profile) }.map { AppHit.Android(it) } +
-        runtime.androidApps.shortcuts.map { AppHit.Shortcut(it) }
+        runtime.androidApps.shortcuts.filterNot { runtime.androidApps.isLocked(it.profile) }.map { AppHit.Shortcut(it) }
 
 /** [AppHit.key]s of the apps pinned to home, on their own or in a folder. */
 private fun pinnedKeys(runtime: Runtime): Set<String> =
@@ -564,6 +564,8 @@ internal fun AppPanel(
                                 // Locked, it lists nothing at all, as Android asks of launchers.
                                 DrawerTab.Private -> {
                                     val locked = apps.privateLocked
+                                    // Below the apps, as on the other tabs.
+                                    section("shortcuts", if (locked) emptyList() else apps.shortcuts.filter { it.private }.map { AppHit.Shortcut(it) })
                                     section(
                                         if (locked) "private apps locked" else "private apps",
                                         if (locked) emptyList() else apps.apps.filter { it.private }.map { AppHit.Android(it) }.filter { it.key !in hidden },
@@ -601,7 +603,7 @@ internal fun AppPanel(
                                         }
                                     }
                                     // Usually few and just added: right above the Linux apps, not past all the Android ones.
-                                    section("shortcuts", apps.shortcuts.filter { !it.work }.map { AppHit.Shortcut(it) })
+                                    section("shortcuts", apps.shortcuts.filter { !it.work && !it.private }.map { AppHit.Shortcut(it) })
                                     section("android", apps.apps.filter { !it.work && !it.private }.map { AppHit.Android(it) }.filter { it.key !in hidden })
                                 }
                             }

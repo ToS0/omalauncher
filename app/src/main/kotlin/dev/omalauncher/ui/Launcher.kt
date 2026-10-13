@@ -134,8 +134,9 @@ private fun DesktopScreen(
     val highlighted = search.highlighted(state.picked)
 
     fun launch(hit: AppHit) {
-        // The private space's apps leave no trace in the phone's own profile: not in recents, not in the ranking.
-        if (!(hit is AppHit.Android && hit.app.private)) runtime.usage.record(hit.key)
+        // The private space's apps and shortcuts leave no trace in the phone's own profile: not in recents, not in the ranking.
+        val private = hit is AppHit.Android && hit.app.private || hit is AppHit.Shortcut && hit.shortcut.private
+        if (!private) runtime.usage.record(hit.key)
         state.query = ""
         state.closeNow()
         when (hit) {
