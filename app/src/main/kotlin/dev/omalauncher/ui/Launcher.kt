@@ -141,6 +141,7 @@ private fun DesktopScreen(
         when (hit) {
             is AppHit.Linux -> runtime.launch(hit.app)
             is AppHit.Android -> runtime.androidApps.open(hit.app)
+            is AppHit.Shortcut -> runtime.androidApps.open(hit.shortcut)
         }
     }
 
@@ -154,6 +155,7 @@ private fun DesktopScreen(
                     when (hit) {
                         is AppHit.Linux -> runtime.widgets.shortcuts.addLinux(hit.app, state.currentPage)
                         is AppHit.Android -> runtime.widgets.shortcuts.addAndroid(hit.app, state.currentPage)
+                        is AppHit.Shortcut -> runtime.widgets.shortcuts.addAndroidShortcut(hit.shortcut, state.currentPage)
                     }
                     Toast.makeText(context, "added to home", Toast.LENGTH_SHORT).show()
                 },
@@ -162,6 +164,11 @@ private fun DesktopScreen(
                     runtime.androidApps.openInfo(app)
                 },
                 uninstall = { app -> runtime.androidApps.uninstall(app) },
+                // Off home too: its tile would only be a name that opens nothing.
+                remove = { shortcut ->
+                    runtime.androidApps.remove(shortcut)
+                    runtime.widgets.shortcuts.removeAndroidShortcut(shortcut)
+                },
             )
         }
 

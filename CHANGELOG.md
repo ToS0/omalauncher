@@ -14,6 +14,9 @@ Dates are when the build was uploaded to Play.
 - The work tab pauses work apps and turns them back on.
 - The private space gets its own tab, which locks and unlocks it; locked, its apps show nowhere,
   and it can hide entirely until "priv" typed in the bar offers to unlock it.
+- Websites installed from a browser (Install app, or Add to home screen) show up
+  on the home screen and in the app drawer, like other apps' shortcuts to home.
+  Browsers didn't offer to install them before.
 
 ## 0.5.0 (versionCode 10) – 2026-10-11
 

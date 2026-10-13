@@ -403,7 +403,8 @@ class Runtime(
         shortcut: Shortcut,
         mono: Boolean,
     ): ImageBitmap? {
-        shortcut.component?.let { androidAppKey(it, shortcut.profile) }?.let { return if (mono) androidApps.masks[it] else androidApps.icons[it] }
+        (shortcut.component?.let { androidAppKey(it, shortcut.profile) } ?: shortcut.androidShortcut?.let { androidShortcutKey(it, shortcut.profile) })
+            ?.let { return if (mono) androidApps.masks[it] else androidApps.icons[it] }
         val id = shortcut.linux?.id ?: return null
         return if (mono) linuxMasks[id] else linuxIcons[id]
     }
@@ -450,6 +451,7 @@ class Runtime(
     fun open(shortcut: Shortcut) {
         shortcut.linux?.let { pinned -> launch(linuxApps.firstOrNull { it.id == pinned.id } ?: pinned) }
         shortcut.component?.let { androidApps.open(it, shortcut.profile) }
+        shortcut.androidShortcut?.let { androidApps.open(it, shortcut.profile) }
     }
 
     /** A deleted profile's pinned apps could never open again, so they leave the home screen with it, as if removed by hand. */
