@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import dev.omalauncher.AndroidApp
 import dev.omalauncher.androidAppKey
 import dev.omalauncher.AndroidShortcut
+import dev.omalauncher.androidShortcutKey
 import androidx.compose.runtime.collectAsState
 import dev.omalauncher.Runtime
 import dev.omalauncher.linux.LinuxState
@@ -222,10 +223,12 @@ private fun allApps(runtime: Runtime): List<AppHit> =
     runtime.linuxApps.map { AppHit.Linux(it) } + runtime.androidApps.apps.filterNot { runtime.androidApps.isLocked(it.profile) }.map { AppHit.Android(it) } +
         runtime.androidApps.shortcuts.filterNot { runtime.androidApps.isLocked(it.profile) }.map { AppHit.Shortcut(it) }
 
-/** [AppHit.key]s of the apps pinned to home, on their own or in a folder. */
+/** [AppHit.key]s of the apps and shortcuts pinned to home, on their own or in a folder. */
 private fun pinnedKeys(runtime: Runtime): Set<String> =
     runtime.widgets.shortcuts.items.mapNotNullTo(HashSet()) { s ->
-        s.component?.let { "a:" + androidAppKey(it, s.profile) } ?: s.linux?.let { AppHit.Linux(it).key }
+        s.component?.let { "a:" + androidAppKey(it, s.profile) }
+            ?: s.androidShortcut?.let { "s:" + androidShortcutKey(it, s.profile) }
+            ?: s.linux?.let { AppHit.Linux(it).key }
     }
 
 internal fun searchApps(
@@ -553,7 +556,7 @@ internal fun AppPanel(
                                 null -> search.hits.chunked(columns).forEachIndexed { r, cells -> row("q:$r", cells, highlighted - r * columns) }
                                 DrawerTab.Work -> {
                                     // Below the apps, as on the personal tab.
-                                    section("shortcuts", apps.shortcuts.filter { it.work }.map { AppHit.Shortcut(it) })
+                                    section("shortcuts", apps.shortcuts.filter { it.work }.map { AppHit.Shortcut(it) }.filter { it.key !in hidden })
                                     val paused = apps.workProfiles.any { apps.paused(it) }
                                     section(
                                         if (paused) "work apps paused" else "work apps",
@@ -565,7 +568,7 @@ internal fun AppPanel(
                                 DrawerTab.Private -> {
                                     val locked = apps.privateLocked
                                     // Below the apps, as on the other tabs.
-                                    section("shortcuts", if (locked) emptyList() else apps.shortcuts.filter { it.private }.map { AppHit.Shortcut(it) })
+                                    section("shortcuts", if (locked) emptyList() else apps.shortcuts.filter { it.private }.map { AppHit.Shortcut(it) }.filter { it.key !in hidden })
                                     section(
                                         if (locked) "private apps locked" else "private apps",
                                         if (locked) emptyList() else apps.apps.filter { it.private }.map { AppHit.Android(it) }.filter { it.key !in hidden },
@@ -603,7 +606,7 @@ internal fun AppPanel(
                                         }
                                     }
                                     // Usually few and just added: right above the Linux apps, not past all the Android ones.
-                                    section("shortcuts", apps.shortcuts.filter { !it.work && !it.private }.map { AppHit.Shortcut(it) })
+                                    section("shortcuts", apps.shortcuts.filter { !it.work && !it.private }.map { AppHit.Shortcut(it) }.filter { it.key !in hidden })
                                     section("android", apps.apps.filter { !it.work && !it.private }.map { AppHit.Android(it) }.filter { it.key !in hidden })
                                 }
                             }
